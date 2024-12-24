@@ -1,4 +1,4 @@
-# Job Platform 'Jovial' — A project by Arham Shah
+# Job Platform 'Jobial' — A project by Arham Shah
 
 ## Technologies
 
