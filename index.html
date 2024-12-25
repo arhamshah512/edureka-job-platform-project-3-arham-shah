@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jobial</title>
+    <script src="https://unpkg.com/alpinejs" defer></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/js-sha256/0.11.0/sha256.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link rel="icon" href="jobial-logo.png">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: '#2F5597'
+                    },
+                    fontFamily: {
+                        rubik: 'Rubik, Ebrima, sans-serif'
+                    }
+                },
+            },
+        }
+    </script>
+    <style type="text/tailwindcss">
+        button {
+            @apply hover:brightness-105 transition-all ring-black focus:ring outline-none
+        }
+
+        .dark-theme {
+            background-color: white;
+        }
+
+        /* Hide the eye button in Microsoft Edge that toggles revealing password */
+        input[type="password"]::-ms-reveal {
+            display: none;
+        }
+    </style>
+</head>
+<body class="font-rubik bg-white" x-data="{  
+    isUserLoggedIn: localStorage.getItem('currentUser') != 'null',
+    isUserNotLoggedIn: localStorage.getItem('currentUser') == 'null'
+}">
+    <div class="p-8 text-lg bg-gray-100" id="theme-options-wrapper">
+        <label class="flex items-center gap-4">
+            <input type="checkbox" class="rounded size-6" id="enable-dark-theme-checkbox"></input>
+            Enable Dark Theme
+            <i class="bi bi-moon-fill opacity-70" aria-hidden="true"></i>
+        </label>
+
+        <hr class="border-gray-300 my-4">
+
+        <label class="flex flex-col">
+            <p id="hue-rotation-label-text-element">Hue rotation</p>
+            <input type="range" class="accent-[#2563eb]" id="hue-rotation-range-input" @input="
+                document.querySelector('#hue-rotation-label-text-element').innerText = `Hue rotation (${$event.target.value > 0 ? '+' : ''}${$event.target.value}°)`
+            " min="-180" value="0" max="180" step="1"></input>
+            <div class="relative">
+                <p class="absolute left-0">-180°</p>
+                <p class="absolute right-0">+180°</p>
+            </div>
+        </label>
+
+        <label class="mt-12 mb-4 flex flex-col">
+            <p id="contrast-label-text-element">Contrast</p>
+            <input type="range" class="accent-[#474e5d]" id="contrast-range-input" @input="
+                document.querySelector('#contrast-label-text-element').innerText = `Contrast (${$event.target.value - 1 &gt; 0 ? '+' : ''}${Number(($event.target.value - 1).toFixed(2))})`
+            " min="0.6" value="1" max="1.4" step="0.01"></input>
+            <div class="relative">
+                <p class="absolute left-0">-0.4</p>
+                <p class="absolute right-0">+0.4</p>
+            </div>
+        </label>
+
+        <fieldset class="mt-12 hidden flex-col gap-2" id="job-listing-cards-background-strength-fieldset">
+            <legend class="font-medium">Job Listing Cards Background Strength</legend>
+
+            <label class="mt-2 flex flex-col-center gap-2">
+                <input type="radio" class="size-6" name="job-listing-cards-background" value="None" checked>
+                None
+            </label>
+
+            <label class="flex flex-col-center gap-2">
+                <input type="radio" class="size-6" name="job-listing-cards-background" value="Subtle">
+                Subtle
+            </label>
+
+            <label class="flex flex-col-center gap-2">
+                <input type="radio" class="size-6" name="job-listing-cards-background" value="Accentuated">
+                Accentuated
+            </label>
+        </fieldset>
+    </div>
+
+    <div class="p-8 flex items-center gap-6">
+        <img class="size-16" src="jobial-logo.png" alt="Jobial logo">
+        <h1 class="text-6xl font-bold">Jobial</h1>
+    </div>
+
+    <div class="p-8 flex flex-wrap gap-4">
+        <button type="button" id="getJobListingsButton" class="leading-none ring-offset-4">Show Job Listings</button>
+        <button type="button" id="createAccountButton" class="leading-none ring-offset-4">Create account</button>
+        <button type="button" id="logInOutButton" class="leading-none ring-offset-4">Login</button>
+        <button type="button" id="getMessagesButton" class="leading-none ring-offset-4">Messages</button>
+    </div>
+
+    <div id="user-login-status"></div>
+
+    <div id="job-listings-page" data-page class="p-8">
+        <h2 class="text-3xl font-bold">Job Listings</h2>
+        <button type='button' class='mt-8 px-6 py-3 w-max leading-none bg-brand rounded-full text-white ring-offset-2' @click="
+            if (localStorage.currentUser != 'null' && JSON.parse(localStorage.currentUser).role === 'Employer') {
+                document.querySelector('#create-job-listing-form-wrapper-dialog').showModal()
+            } else {
+                popUp('Only employers (users of role employer) can create job listings.')
+            }
+        " id="create-job-listing-button">
+            <i class="bi bi-plus-lg mr-2" aria-hidden="true"></i>
+            Create job listing
+        </button>
+
+        <div id="search-and-filtering-and-wrapper" class="mt-4 space-y-4">
+            <fieldset id="filter-job-listings-fieldset-for-job-seekers">
+                <legend class="font-medium">Filter job listings</legend>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-job-seekers" data-job-listings-filter-all value="all" checked>
+                    All
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-job-seekers" data-job-listings-filter-applied-for value="applied-for">
+                    Applied for
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-job-seekers"  data-job-listings-filter-not-applied-for value="not-applied-for">
+                    Not applied for
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-job-seekers"  data-job-listings-filter-pending value="pending">
+                    Pending
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-job-seekers"  data-job-listings-filter-pending value="not-pending">
+                    Not pending
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-job-seekers"  data-job-listings-filter-accepted value="accepted">
+                    Accepted
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-job-seekers"  data-job-listings-filter-rejected value="rejected">
+                    Rejected
+                </label>
+            </fieldset>
+
+            <fieldset id="filter-job-listings-fieldset-for-employers">
+                <legend class="font-medium">Filter job listings</legend>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-employers" data-job-listings-filter-all value="all" checked>
+                    All
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-employers"  data-job-listings-filter-created-by-you value="created-by-you">
+                    Created by you
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-employers"  data-job-listings-filter-not-created-by-you value="not-created-by-you">
+                    Not created by you
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-employers" data-job-listings-filter-has-applications-pending-to-accept-or-reject value="has-applications-pending-to-accept-or-reject">
+                    Has applications pending to accept or reject
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-employers"  data-job-listings-filter-all-applications-pending-to-accept-or-reject value="all-applications-pending-to-accept-or-reject">
+                    All applications pending to accept or reject
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-employers"  data-job-listings-filter-no-application-pending-to-accept-or-reject value="no-application-pending-to-accept-or-reject">
+                    No application pending to accept or reject
+                </label>
+
+
+                <label class="flex items-center gap-2">
+                    <input type="radio" name="job-listings-filter-for-employers"  data-job-listings-filter-has-received-no-applications value="has-received-no-applications">
+                    Has received no applications
+                </label>
+            </fieldset>
+
+            <label class="inline-flex flex-col gap-4 w-max">Search</label>
+
+            <div class="flex items-center gap-2">
+                <input type="search" id="search-job-listings-input" class="rounded">
+    
+                <button id="search-job-listings-button" class="leading-none bg-[#dbe3f0] p-[0.8125rem] rounded">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <p class="sr-only">Search job listings</p>
+                </button>
+            </div>
+
+            <fieldset>
+                <legend class="font-medium">Search options</legend>
+
+                <label class="flex items-center gap-2">
+                    <input id="match-case-checkbox" type="checkbox" class="rounded-sm">
+                    Match case
+                </label>
+
+                <label class="flex items-center gap-2">
+                    <input id="use-regex-checkbox" type="checkbox" class="rounded-sm">
+                    Use regular expressions
+                </label>
+            </fieldset>
+        </div>
+
+        <div id="job-listings-wrapper" class="mt-4 flex flex-wrap gap-4"></div>
+    </div>
+
+    <form
+        id="account-creation-form"
+        data-page
+        class="p-8"
+        x-data="{
+            role: 'Employer',
+            name: '',
+            username: '',
+            plainPasscode: ''
+        }"
+        @input="
+            $refs.accountCreationSubmitButton.disabled = !(
+                name.trim() !== '' && isUsernameValid(username) && isPasscodeValid(plainPasscode)
+            )
+        "
+        @submit.prevent="
+            console.log('Does username already exist?',
+                await fetch('http://localhost:3000/api/create-new-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ role, name, username, plainPasscode: '', hashedPasscode: sha256(plainPasscode + '@lsteδ satiθn-syncr3ti') })
+                }) === 'Username already exists.'
+            )
+        "
+    >
+         <h2 class="text-3xl font-bold">Create new account</h2>
+
+        <fieldset class='mt-4 px-6 py-4 rounded border'>
+            <legend class='px-1 -ml-3 font-medium'>Select your role</legend>
+
+            <label for='employer-role-radio' class='flex items-center gap-2'>
+                <input
+                    id='employer-role-radio' required
+                    type="radio" name="user-role" value="Employer" checked
+                    @input="role = $event.target.value"
+                />
+                Employer
+            </label>
+
+            <label for='job-seeker-role-radio' class='flex items-center gap-2'>
+                <input
+                    id='job-seeker-role-radio' required
+                    type="radio" name="user-role" value="Job Seeker"
+                    @input="role = $event.target.value"
+                />
+                Job seeker
+            </label>
+        </fieldset>
+
+        <label class='grid gap-2 mt-4 font-medium'>
+            <p x-text="
+                role === 'Employer'
+                    ? `Organisation's name`
+                    : `Your name`
+            "></p>
+
+            <input class='rounded-md' type="text" x-model="name" required />
+        </label>
+
+        <label class='grid gap-2 mt-4'>
+            <p class="font-medium">Username</p>
+                <ul class="list-disc">
+                    <li>Allowed characters are letters (lowercase and uppercase), digits (0–9), hyphens (-), periods (.) and underscores (_)</li>
+                    <li>Must not start with a period (.)</li>
+                    <li>Must contain at least one digit</li>
+                    <li data-username-character-count-criteria-text-element>Must be of 4 to 40 characters</li>
+                </ul>
+            <input class='rounded-md' type="text" x-model="username" @input="
+                document.querySelector('[data-username-character-count-criteria-text-element]').innerHTML =
+                `Must be of 4 to 40 characters<br>(character count: ${$event.target.value.length})`
+            " required />
+        </label>
+
+        <label class='grid gap-2 mt-4'>
+            <p class="font-medium">Passcode</p>
+            <ul class="list-disc">
+                <li>Must contain at least one lowercase letter (a to z)</li>
+                <li>Must contain at least one uppercase letter (A to Z)</li>
+                <li>Must contain at least one digit (0–9)</li>
+                <li>Must contain at least one special character <span class="font-mono">!@#$%&^_()[]{}<>+-*/\:;'",.|`~=?</span></li>
+                <li>Must be of at least 8 characters</li>
+            </ul>
+            <input x-model="plainPasscode" class='rounded-md' id="account-creation-passcode-input" type="password" required />
+            <button type="button" id="account-creation-reveal-hide-passcode-button" class="mr-auto">
+                <i class="bi bi-eye" aria-hidden="true"></i>
+                Reveal passcode
+            </button>
+        </label>
+
+        <button x-ref="accountCreationSubmitButton" type='submit' class='disabled:opacity-50 mt-8 px-6 py-3 w-max leading-none bg-brand rounded-full text-white'>Create account</button>
+    </form>
+
+    <form x-data="{
+        username: '',
+        plainPasscode: ''
+    }" class="p-8" id="login-page" data-login-form data-page>
+        <h2 class="text-3xl font-bold">Log into your account</h2>
+
+        <label class='grid gap-2 mt-4 font-medium'>
+            Username
+            <input class='rounded-md' type="text" x-model="username" required />
+        </label>
+
+        <div>
+            <label class='grid gap-2 mt-4 font-medium'>
+                Passcode
+                <input class='rounded-md' type="password" id="login-passcode-input" x-model="plainPasscode" required />
+            </label>
+    
+            <button type="button" id="login-reveal-hide-passcode-button" class="mr-auto">
+                <i class="bi bi-eye" aria-hidden="true"></i>
+                Reveal passcode
+            </button>
+        </div>
+
+        <button type='submit' class='mt-8 px-6 py-3 w-max leading-none bg-brand rounded-full text-white'>Login</button>
+    </form>
+
+    <div id="messages-page" data-page class="p-8">
+        <h2 class="text-3xl font-bold">Messages</h2>
+
+        <div id="messages-wrapper" class="space-y-4"></div>
+    </div>
+
+    <dialog id="send-application-form-wrapper-dialog" class="rounded-md pt-4 px-6">
+        <!-- Filled by JS -->
+    </dialog>
+
+    <dialog id="create-job-listing-form-wrapper-dialog" class="w-full lg:w-1/2 px-6 py-4 text-lg border-none rounded-2xl backdrop:backdrop-blur-md">
+        <!-- Filled by JS -->
+    </dialog>
+
+    <script src="client-side-scripts/main.js"></script>
+    <script src="client-side-scripts/search-and-filter-job-listings.js"></script>
+    <script src="client-side-scripts/theme.js"></script>
+</body>
+</html>
