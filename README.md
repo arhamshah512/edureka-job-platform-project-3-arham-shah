@@ -39,7 +39,6 @@
 3. Passcode reveal/hide button
 
 - Logging out
-1. Before logging out, you will be asked if you're sure you want to log out
 2. By logging out, you won't be able create job listings or apply for job listings, and employers won't be able to send messages to applicants.
 3. You can (of course) log in and out at any time.
 
@@ -57,4 +56,4 @@
 7. Job seekers can unapply for them or view their applications
 8. Job seekers can see whether their application is pending, accepted or rejected
 9. Employers can manage the applications on job listings they created.
-10. Employers can send messages to an applicant and both employers and job seekers read those messages
+10. Employers can send messages to an applicant and both employers and job seekers can read those messages
